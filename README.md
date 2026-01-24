@@ -28,8 +28,9 @@ Berbeda dengan aplikasi keuangan yang penuh dengan grafik kompleks dan menu yang
 
 ### 2. Setup Folder di VPS
 ```bash
-git clone [https://github.com/b4khtiar/litespend-bot.git](https://github.com/b4khtiar/litespend-bot.git)
+git clone https://github.com/b4khtiar/litespend-bot.git
 cd litespend-bot
+mkdir data
 ```
 ### 3. Konfigurasi Environment
 Buat file .env di root folder:
