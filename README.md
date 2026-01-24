@@ -1,6 +1,10 @@
 # 💸 LiteSpend Bot: Personal Finance Habit Tracker
 
-**LiteSpend** adalah bot Telegram minimalis yang dirancang untuk satu tujuan: **membangun kebiasaan mencatat keuangan tanpa ribet.** Berbeda dengan aplikasi keuangan yang penuh dengan grafik kompleks dan menu yang membingungkan, LiteSpend mengutamakan kecepatan input dan kesederhanaan. Dirancang untuk bisa dijalankan sendiri (*self-hosted*) di server rumah VPS spesifikasi rendah (Low-Spec).
+**LiteSpend** adalah bot Telegram minimalis yang dirancang untuk satu tujuan: **membangun kebiasaan mencatat keuangan tanpa ribet.** 
+
+Berbeda dengan aplikasi keuangan yang penuh dengan grafik kompleks dan menu yang membingungkan, LiteSpend mengutamakan kecepatan input dan kesederhanaan. Dirancang untuk bisa dijalankan sendiri (*self-hosted*) di server rumah VPS spesifikasi rendah (Low-Spec).
+
+<img src="https://blog.bakhtiar.my.id/wp-content/uploads/2026/01/1000279845-459x1024.jpg" alt="LiteSpend Bot Screenshot" width="40%" height="auto">
 
 ## ✨ Fitur Utama
 - ⚡ **Hybrid Input:** Ketik nominal (e.g., `Kopi 15k`) dan pilih kategori lewat tombol interaktif.
@@ -29,15 +33,13 @@ cd litespend-bot
 ```
 ### 3. Konfigurasi Environment
 Buat file .env di root folder:
-```
+```env
 TOKEN=12345678:ABCDEFG_YOUR_TOKEN
 ALLOWED_ID=123456789
 ```
 
 ### 4. Jalankan dengan Podman
-```
-Bash
-
+```bash
 podman-compose up --build -d
 ```
 ## ⌨️ Command Bot
@@ -54,18 +56,17 @@ Untuk menjaga chat tetap bersih, gunakan "Auto-Delete Messages":
 4. Pilih Enable Auto-Delete (Bisa pilih 24 jam, 1 minggu, atau custom).
 
 ## 🏗️ Struktur Proyek
-```Plaintext
+```plaintext
 
 ├── src/
 │   ├── bot.py         # Logika utama bot & scheduler
-│   └── database.py    # Inisialisasi skema SQLite
 ├── data/              # Persistent storage (finance.db & CSV)
 ├── Dockerfile      # Definisi image container (Alpine based)
 └── docker-compose.yml
 ```
 
 ## 🤝 Kontribusi
-
+****
 Bot ini dibuat untuk penggunaan pribadi yang praktis. Jika kamu punya ide fitur atau menemukan bug, silakan buka Issue atau kirimkan Pull Request.
 
 

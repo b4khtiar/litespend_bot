@@ -9,5 +9,5 @@ RUN pip install --no-cache-dir pyTelegramBotAPI schedule
 # Copy source code
 COPY src/ .
 
-# Jalankan inisialisasi database lalu bot
+# Jalankan bot
 CMD ["python3", "bot.py"]
