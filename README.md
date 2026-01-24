@@ -50,7 +50,7 @@ podman-compose up --build -d
 - /export - Mendapatkan file CSV seluruh data transaksi.
 - /stats - Lihat statistik habit plus motivasi terpilih.
 
-## Tips
+## ℹ️ Tips
 Untuk menjaga chat tetap bersih, gunakan "Auto-Delete Messages":
 1. Buka chat bot kamu di Telegram.
 2. Klik nama bot di bagian atas.
@@ -63,7 +63,7 @@ Untuk menjaga chat tetap bersih, gunakan "Auto-Delete Messages":
 ├── src/
 │   ├── bot.py         # Logika utama bot & scheduler
 ├── data/              # Persistent storage (finance.db & CSV)
-├── Dockerfile      # Definisi image container (Alpine based)
+├── Dockerfile        # Definisi image container (Alpine based)
 └── docker-compose.yml
 ```
 
