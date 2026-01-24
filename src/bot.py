@@ -113,7 +113,7 @@ def get_user_stats():
     c = conn.cursor()
     
     # Ambil data dari database
-    c.execute("SELECT COUNT(*), MIN(date) FROM transactions")
+    c.execute("SELECT COUNT(*), MIN(datetime(date, '+7 hours')) FROM transactions")
     total_entries, start_date = c.fetchone()
     
     c.execute("SELECT category, COUNT(category) as count FROM transactions GROUP BY category ORDER BY count DESC LIMIT 1")
@@ -193,7 +193,12 @@ def export_csv(message):
     try:
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
-        c.execute("SELECT date, category, description, amount FROM transactions ORDER BY date DESC")
+        query = """
+            SELECT datetime(date, '+7 hours'), category, description, amount 
+            FROM transactions 
+            ORDER BY date DESC
+        """
+        c.execute(query)
         rows = c.fetchall()
         conn.close()
         with open(file_path, 'w', newline='', encoding='utf-8') as f:
