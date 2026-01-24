@@ -146,7 +146,7 @@ def delete_last_transaction():
 # Keamanan: Cek ID
 @bot.message_handler(func=lambda message: message.from_user.id != ALLOWED_ID)
 def unauthorized(message):
-    bot.reply_to(message, "Akses ditolak. Ini bot pribadi.")
+    bot.reply_to(message, "❌ Akses ditolak. Ini bot pribadi.")
 
 #Jalankan init_db sebelum polling
 init_db()
@@ -227,7 +227,14 @@ def export_csv(message):
         with open(file_path, 'w', newline='') as f:
             writer = csv.writer(f)
             writer.writerow(['Tanggal', 'Kategori', 'Keterangan', 'Nominal']) # Header
-            writer.writerows(rows)
+
+            # Membersihkan emoji dari kolom Kategori
+            # Regex ini akan menghapus karakter non-ASCII (termasuk emoji)
+            for row in rows:
+                clean_category = re.sub(r'[^\x00-\x7F]+', '', row[1]).strip()
+                
+                # Masukkan data yang sudah bersih ke CSV
+                writer.writerow([row[0], clean_category, row[2], row[3]])
 
         with open(file_path, 'rb') as f:
             bot.send_document(message.chat.id, f, caption="📂 Ini data keuangan kamu dalam format CSV.")
