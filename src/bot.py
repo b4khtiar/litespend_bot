@@ -6,12 +6,23 @@ import schedule
 import threading
 import time
 import csv
+import random
 from telebot import types
 
 # Konfigurasi
 TOKEN = os.environ.get('TOKEN')
 ALLOWED_ID = int(os.environ.get('ALLOWED_ID', 0))
 DB_PATH = os.path.join(os.getcwd(), 'data', 'finance.db')
+MOTIVASI_BANK = [
+    "Keep it up! Konsistensi adalah kunci. 🚀",
+    "Hemat hari ini, tenang di masa depan. 💰",
+    "Bukan tentang seberapa banyak yang dihasilkan, tapi seberapa banyak yang disimpan. ✨",
+    "Disiplin keuangan adalah bentuk kebebasan. 🔥",
+    "Catatan kecil hari ini adalah rencana besar untuk esok. 📝",
+    "Uangmu adalah hasil kerja kerasmu, hargai dengan mencatatnya. 💪",
+    "Satu entri hari ini, satu langkah menuju financial freedom. 🏁",
+    "Habit yang baik lebih berharga daripada saldo yang besar. 🌟"
+]
 
 bot = telebot.TeleBot(TOKEN)
 user_data = {}
@@ -97,6 +108,43 @@ def delete_last_transaction():
     except Exception as e:
         return f"❌ Error: {e}"
 
+def get_user_stats():
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    
+    # Ambil data dari database
+    c.execute("SELECT COUNT(*), MIN(date) FROM transactions")
+    total_entries, start_date = c.fetchone()
+    
+    c.execute("SELECT category, COUNT(category) as count FROM transactions GROUP BY category ORDER BY count DESC LIMIT 1")
+    most_freq = c.fetchone()
+    
+    c.execute("SELECT COUNT(DISTINCT date(date)) FROM transactions")
+    active_days = c.fetchone()[0]
+    conn.close()
+    
+    if not total_entries:
+        return "Belum ada statistik. Yuk, mulai mencatat!"
+
+    # Bersihkan tampilan tanggal
+    start_date_clean = start_date.split()[0] if start_date else "-"
+    freq_text = f"{most_freq[0]} ({most_freq[1]}x)" if most_freq else "-"
+
+    # Ambil motivasi random
+    pesan_motivasi = random.choice(MOTIVASI_BANK)
+
+    stats_text = (
+        "📈 *STATISTIK PENGGUNAAN*\n"
+        "━━━━━━━━━━━━━━━\n"
+        f"🗓️ *Mulai Sejak:* `{start_date_clean}`\n"
+        f"📝 *Total Entri:* `{total_entries} kali`\n"
+        f"🔥 *Hari Aktif:* `{active_days} hari`\n"
+        f"🏷️ *Kategori Favorit:* `{freq_text}`\n"
+        "━━━━━━━━━━━━━━━\n"
+        f"_{pesan_motivasi}_"
+    )
+    return stats_text
+
 # --- SCHEDULER ---
 
 def check_and_remind():
@@ -134,6 +182,10 @@ def rekap_menu(message):
     markup.add(types.InlineKeyboardButton("Hari Ini", callback_data='rekap_daily'),
                types.InlineKeyboardButton("Bulan Ini", callback_data='rekap_monthly'))
     bot.reply_to(message, "Pilih periode:", reply_markup=markup)
+
+@bot.message_handler(commands=['stats'])
+def stats_command(message):
+    bot.reply_to(message, get_user_stats(), parse_mode="Markdown")
 
 @bot.message_handler(commands=['export'])
 def export_csv(message):

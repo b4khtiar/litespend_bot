@@ -47,6 +47,7 @@ podman-compose up --build -d
 - /rekap - Melihat laporan harian dan bulanan (grouping kategori).
 - /hapus - Menghapus transaksi terakhir jika salah input.
 - /export - Mendapatkan file CSV seluruh data transaksi.
+- /stats - Lihat statistik habit plus motivasi terpilih.
 
 ## Tips
 Untuk menjaga chat tetap bersih, gunakan "Auto-Delete Messages":
