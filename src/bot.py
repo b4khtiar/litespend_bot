@@ -170,11 +170,27 @@ def unauthorized(message):
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
+    first_name = message.from_user.first_name
     markup = types.InlineKeyboardMarkup(row_width=2)
-    markup.add(types.InlineKeyboardButton("📊 Rekap", callback_data='rekap_daily'),
-               types.InlineKeyboardButton("🗑️ Hapus", callback_data='confirm_delete'))
-    bot.send_message(message.chat.id, f"👋 Halo *{message.from_user.first_name}*!\nKetik `Barang Harga` untuk mencatat.", 
-                     parse_mode="Markdown", reply_markup=markup)
+    btn_rekap = types.InlineKeyboardButton("📊 Lihat Rekap", callback_data='rekap_daily')
+    btn_stats = types.InlineKeyboardButton("📈 Cek Stats", callback_data='show_stats')
+    markup.add(btn_rekap, btn_stats)
+
+    welcome_text = (
+        f"👋 *Halo, {first_name}!*\n\n"
+        "Saya *LiteSpend*, asisten yang siap membantu menjaga habit keuanganmu.\n\n"
+        " langsung ketik untuk mencatat:\n"
+        "👉 `Kopi 15k` atau `Bensin 20000`\n\n"
+        "Setelah itu, pilih kategori yang sesuai. Gampang kan?\n\n"
+        "📌 *Tips:* Gunakan menu di bawah untuk akses cepat."
+    )
+    
+    bot.send_message(
+        message.chat.id, 
+        welcome_text, 
+        parse_mode="Markdown", 
+        reply_markup=markup
+    )
 
 @bot.message_handler(commands=['rekap'])
 def rekap_menu(message):
