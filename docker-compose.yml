@@ -9,4 +9,4 @@ services:
       - TOKEN=12345678:ABCDEFG_YOUR_TOKEN # Your bot token
       - ALLOWED_ID=123456789 # Your telegram ID
     volumes:
-      - ./finance_bot/data:/app/data
+      - ./data:/app/data
