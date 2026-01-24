@@ -201,6 +201,7 @@ def export_csv(message):
             writer.writerow(['Tanggal', 'Kategori', 'Keterangan', 'Nominal'])
             for row in rows:
                 clean_cat = re.sub(r'[^\x00-\x7F]+', '', row[1]).strip()
+                clean_cat = " ".join(clean_cat.split()).strip()
                 writer.writerow([row[0], clean_cat, row[2], row[3]])
         with open(file_path, 'rb') as f:
             bot.send_document(message.chat.id, f, caption="📂 Data Ekspor CSV")
