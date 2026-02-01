@@ -108,9 +108,9 @@ def get_last_transaction():
         if last_row:
             row_id, desc, amount = last_row
             conn.close()
-            return f"🔍 *Entri terakhir:* {desc} (Rp {amount:,.0f})"
+            return f"🔍 Entri terakhir: {desc} (Rp {amount:,.0f})"
         conn.close()
-        return "❌ Tidak ada data."
+        return "0"
     except Exception as e:
         return f"❌ Error: {e}"
 
@@ -233,11 +233,16 @@ def send_welcome(message):
 
 @bot.message_handler(commands=['hapus'])
 def hapus_command(message):
+    data = get_last_transaction()
+    if data == "0":
+        text = "❌ *Tidak ada data.*"
+        bot.reply_to(message, text, parse_mode="Markdown")
+        return
     markup = types.InlineKeyboardMarkup()
     markup.add(
         types.InlineKeyboardButton("🗑️ Hapus", callback_data='confirm_delete'),
         types.InlineKeyboardButton("❌ Batal", callback_data='cancel_delete'))
-    bot.reply_to(message, get_last_transaction(), reply_markup=markup)
+    bot.reply_to(message, data, reply_markup=markup)
 
 
 @bot.message_handler(commands=['rekap'])
