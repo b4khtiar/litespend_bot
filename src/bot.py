@@ -1,16 +1,18 @@
-import telebot
 import os
-from telebot import types
+import re
+import io
+import telebot
 import database
 import functions
 import scheduler
-import io
+from telebot import types
 from datetime import datetime
 
 TOKEN = os.environ.get('TOKEN')
 ALLOWED_ID = int(os.environ.get('ALLOWED_ID', 0))
 
 bot = telebot.TeleBot(TOKEN)
+user_data = {}
 
 # Jangan merespon user selain allowed_id
 @bot.message_handler(func=lambda message: message.from_user.id != ALLOWED_ID)
@@ -123,7 +125,7 @@ def handle_callbacks(call):
 
     elif call.data.startswith('cat_'):
         category = call.data.replace("cat_", "")
-        data = user_data.get(call.message.chat.id)
+        data = user_data.get(user_id)
         if data:
             if functions.save_transaction(data['amount'], category, data['desc'], user_id):
                 bot.edit_message_text(
@@ -131,7 +133,7 @@ def handle_callbacks(call):
                     call.message.chat.id,
                     call.message.message_id,
                     parse_mode="Markdown")
-                del user_data[call.message.chat.id]
+                del user_data[user_id]
         else:
             bot.answer_callback_query(call.id, "Sesi habis, input ulang ya.")
 
@@ -153,7 +155,6 @@ def handle_callbacks(call):
 
 @bot.message_handler(func=lambda message: True)
 def handle_text(message):
-    user_id = message.chat.id
     match = re.search(r'(\d+)\s*(k|rb)?', message.text.lower())
     if match:
         nominal = int(match.group(1)) * (1000 if match.group(2) else 1)
@@ -167,7 +168,7 @@ def handle_text(message):
             "🏠 Rumah & Tagihan",  # Listrik, air, belanja dapur, sabun
             "🛵 Transportasi",     # Bensin, ojek online, parkir
             "☕ Jajan & Hiburan",  # Kopi, nonton, hobi
-            "💳 Cicilan & Hutang",   # Khusus untuk kartu kredit, paylater, motor, dll
+            "💳 Cicilan & Hutang", # Khusus untuk kartu kredit, paylater, motor, dll
             "💊 Kesehatan",        # Obat, skincare, gym
             "🎁 Sosial & Amal",    # Sedekah, kado, kondangan
             "✨ Lainnya"           # Pengeluaran tak terduga
