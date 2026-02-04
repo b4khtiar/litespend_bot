@@ -6,8 +6,14 @@ from functions import check_and_remind_logic, get_weekly_insight_logic
 def run_scheduler(bot, allowed_id):
     def job_remind():
         # Cek data di functions.py, jika perlu kirim pesan via bot
-        if check_and_remind_logic(allowed_id):
-            bot.send_message(allowed_id, "🔔 *Reminder:* Belum ada catatan hari ini!", parse_mode="Markdown")
+        need_reminder = check_and_remind_logic(allowed_id)
+        if need_reminder:
+            text = (
+                "🔔 *Halo! Jangan sampai lupa...*\n\n"
+                "Cukup 10 detik untuk mencatat pengeluaranmu hari ini. ⏱️\n"
+                "Ketik saja: `Bensin 25rb` atau apa pun yang baru kamu beli."
+            )
+            bot.send_message(allowed_id, text, parse_mode="Markdown")
 
     def job_insight():
         insight_text = get_weekly_insight_logic(allowed_id)

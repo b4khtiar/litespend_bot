@@ -30,11 +30,13 @@ def start(message):
 
     welcome_text = (
         f"👋 *Halo, {first_name}!*\n\n"
-        "Saya *LiteSpend*, asisten yang siap membantu menjaga habit keuanganmu.\n\n"
-        " langsung ketik untuk mencatat:\n"
-        "👉 `Kopi 15k` atau `Bensin 20000`\n\n"
-        "Setelah itu, pilih kategori yang sesuai. Gampang kan?\n\n"
-        "📌 *Tips:* Gunakan menu di bawah untuk akses cepat.")
+        "Aku *LiteSpend*, ruang aman untuk mencatat perjalanan uangmu. 🍃\n\n"
+        "Membangun habit finansial nggak ribet. Cukup ketik apa pun yang kamu beli, sesantai chat ke teman:\n\n"
+        "👉 `Kopi 15rb`\n"
+        "👉 `Nasipadang 25.000`\n\n"
+        "Nanti tinggal pilih kategorinya. Selesai dalam 3 detik! ✨\n\n"
+        "📌 *Ingat:* Bukan soal berapa besar angkanya, tapi soal betapa hebatnya kamu sudah mulai peduli hari ini."
+    )
 
     bot.send_message(message.chat.id,
                      welcome_text,
@@ -48,7 +50,13 @@ def stats(message):
     text = functions.get_stats_logic(user_id)
     bot.reply_to(message, text, parse_mode="Markdown")
 
-# Tambahkan handler lainnya (rekap, delete, export) di sini...
+@bot.message_handler(commands=['insight'])
+def insight(message):
+    if message.from_user.id != ALLOWED_ID: return
+    user_id = message.from_user.id
+    text = functions.get_weekly_insight_logic(user_id)
+    bot.reply_to(message, text, parse_mode="Markdown")
+
 @bot.message_handler(commands=['rekap'])
 def rekap_menu(message):
     markup = types.InlineKeyboardMarkup()
@@ -113,7 +121,7 @@ def handle_callbacks(call):
         if data:
             if functions.save_transaction(data['amount'], category, data['desc'], user_id):
                 bot.edit_message_text(
-                    f"✅ *Tersimpan!*\n💰 Rp {data['amount']:,}\n📝 {data['desc']}\n🏷️ {category}",
+                    f"✅ **{data['desc']}** senilai **Rp {data['amount']:,}** masuk ke kategori **{category}**.",
                     call.message.chat.id,
                     call.message.message_id,
                     parse_mode="Markdown")
@@ -124,9 +132,9 @@ def handle_callbacks(call):
     elif call.data == 'confirm_delete':
         deleted = functions.delete_last_transaction(user_id)
         if deleted:
-            text = f"✅ *Entri terakhir dihapus!*"
+            text = "🗑️ *Terhapus!* Data terakhir sudah dibersihkan. Input ulang jika ingin memperbaiki."
         else:
-            text = "❌ *Gagal menghapus entri terakhir.*"
+            text = "❌ *Gagal.* Kamu belum menginput data apa pun hari ini."
         bot.edit_message_text(text,
                               call.message.chat.id,
                               call.message.message_id,
@@ -136,7 +144,6 @@ def handle_callbacks(call):
         bot.edit_message_text(":leftwards_arrow_with_hook: Batal menghapus.", call.message.chat.id,
                               call.message.message_id,
                               parse_mode="Markdown")
-
 
 @bot.message_handler(func=lambda message: True)
 def handle_text(message):
@@ -150,21 +157,29 @@ def handle_text(message):
 
         markup = types.InlineKeyboardMarkup(row_width=2)
         cats = [
-            '🍴 Makan', '🚗 Transport', '🛍️ Jajan', '🏠 Rumah', '💊 Kesehatan',
-            '📚 Edukasi', '✨ Lainnya'
+            "🍱 Makan & Minum",
+            "🏠 Rumah & Tagihan",  # Listrik, air, belanja dapur, sabun
+            "🛵 Transportasi",     # Bensin, ojek online, parkir
+            "☕ Jajan & Hiburan",  # Kopi, nonton, hobi
+            "💳 Cicilan & Hutang",   # Khusus untuk kartu kredit, paylater, motor, dll
+            "💊 Kesehatan",        # Obat, skincare, gym
+            "🎁 Sosial & Amal",    # Sedekah, kado, kondangan
+            "✨ Lainnya"           # Pengeluaran tak terduga
         ]
         markup.add(*[
             types.InlineKeyboardButton(c, callback_data=f"cat_{c}")
             for c in cats
         ])
         bot.reply_to(message,
-                     f"💰 *Rp {nominal:,}* - {deskripsi}\nPilih kategori:",
+                     f"💰 *Rp {nominal:,}* untuk {deskripsi}\nPilih kategori:",
                      reply_markup=markup,
                      parse_mode="Markdown")
     else:
-        bot.reply_to(message,
-                     "❓ Format salah, gunakan `NamaBarang Harga` (Contoh: Kopi 15k)",
-                     parse_mode="Markdown")
+        text = ("🤔 *Ups, aku kurang mengerti maksudmu.*\n\n"
+                "Coba ketik seperti ini ya:\n"
+                "👉 `Kopi 15k` atau `Bensin 20000`\n\n"
+                "Cukup nama barang diikuti harganya. Yuk, coba lagi! 🚀")
+        bot.reply_to(message, text, parse_mode="Markdown")
 
 if __name__ == "__main__":
     database.init_db()

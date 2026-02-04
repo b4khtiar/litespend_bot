@@ -6,15 +6,22 @@ import re
 import csv
 
 MOTIVASI_BANK = [
-    "Hemat hari ini, tenang di masa depan. 💰",
-    "Disiplin keuangan adalah bentuk kebebasan. 🔥",
-    "Catatan kecil hari ini adalah rencana besar untuk esok. 📝",
-    "Keep it up! Konsistensi adalah kunci. 🚀",
-    "Bukan tentang seberapa banyak yang dihasilkan, tapi seberapa banyak yang disimpan. ✨",
-    "Catatan kecil hari ini adalah rencana besar untuk esok. 📝",
     "Uangmu adalah hasil kerja kerasmu, hargai dengan mencatatnya. 💪",
-    "Satu entri hari ini, satu langkah menuju financial freedom. 🏁",
-    "Habit yang baik lebih berharga daripada saldo yang besar. 🌟"
+    "Tiap catatan kecil adalah langkah besar menuju kebebasan finansialmu! 🚀",
+    "Mengetahui ke mana uangmu pergi adalah bentuk kasih sayang pada diri sendiri. ❤️",
+    "Kamu yang pegang kendali! Mencatat hari ini berarti menang besok. 🏆",
+    "Small steps, big impact. Terima kasih sudah disiplin hari ini! 🌟",
+    "Mencatat bukan soal membatasi, tapi soal memberi ruang untuk hal yang berarti. 🌈",
+    "Keuangan yang sehat dimulai dari kejujuran pada diri sendiri. Keep it up! 📈",
+    "Kamu baru saja menyelamatkan masa depanmu dengan satu catatan ini. 🛡️",
+    "Fokus pada progres, bukan kesempurnaan. Kamu luar biasa hari ini! ✨",
+    "Uang adalah alat, dan kamu adalah masternya. Lanjutkan kebiasaan baik ini! 👑",
+    "Pikiran jadi lebih tenang, tidur pun jadi lebih nyenyak. 🌙",
+    "Disiplin finansial hari ini adalah tiket liburanmu di masa depan. ✈️",
+    "Satu input satu langkah menjauh dari rasa cemas. You got this! 💪",
+    "Mengelola uang adalah cara terbaik untuk menghargai kerja kerasmu. 💎",
+    "Tidak ada pengeluaran yang terlalu kecil untuk dicatat. Teliti itu keren! 😎",
+    "Masa depan yang lebih kaya sedang tersenyum padamu. 💰",
 ]
 
 def save_transaction(amount, category, description, user_id):
@@ -60,7 +67,10 @@ def check_and_remind_logic(user_id):
     c.execute("SELECT COUNT(*) FROM transactions WHERE date(date, '+7 hours') = date('now', '+7 hours') AND user_id=?", (user_id,))
     count = c.fetchone()[0]
     conn.close()
-    return count == 0
+    # if no result, return True
+    if count == 0:
+        return True
+    return False
 
 def get_weekly_insight_logic(user_id):
     # Ambil penanda minggu ini (Contoh: '2023-42' untuk tahun 2023 minggu ke-42)
@@ -85,11 +95,20 @@ def get_weekly_insight_logic(user_id):
 
     diff = this_week_total - last_week_total
     diff_percent = diff / last_week_total * 100 if last_week_total > 0 else 0
-    status = "naik 🔴" if diff > 0 else "turun 🟢"
+    status = "Stabil"
+    suggestion = "Pengeluaranmu minggu ini stabil banget! ⚖️ Ini tanda kamu sudah punya kontrol yang matang atas gaya hidupmu. Predictable is good! 👏"
+    if diff > 0:
+        status = "🔴 Naik " + str(diff_percent) + "%"
+        suggestion = "Minggu yang cukup sibuk buat dompetmu, ya? 💸 Mencatat saat pengeluaran naik itu justru yang paling hebat, karena kamu berani menghadapi realita. Besok kita coba lebih disiplin lagi, yuk!"
+    elif diff < 0:
+        status = "🟢 Turun " + str(diff_percent) + "%"
+        suggestion = "Lihat deh angkanya... lebih hijau! 🍏 Kamu sukses mengendalikan godaan minggu ini. Pertahankan konsistensinya ya!"
     
-    insight_text = (f"💡 *INSIGHT MINGGUAN*\n"
-                        f"Pengeluaranmu {status} {diff_percent:.1f}% dibanding pekan lalu.\n"
-                        f"Total seminggu ini: `Rp {this_week_total:,.0f}`")
+    insight_text = (f"📅 *Weekly Financial Insight*\n"
+                    "Halo! Seminggu ini kamu luar biasa tetap konsisten mencatat. Inilah rangkuman perjalanan uangmu:\n"
+                    f"💰 Total Pengeluaran: `Rp {this_week_total:,.0f}` ({status})\n\n"
+                    f"💡 {suggestion}"
+                )
 
     # 3. Simpan hasil kalkulasi ke tabel insights agar minggu depan tidak hitung lagi
     c.execute("""INSERT INTO insights (user_id, period_type, period_date, total_amount, trend_percent, insight_text) 
@@ -132,7 +151,7 @@ def get_stats_logic(user_id):
                   "━━━━━━━━━━━━━━━\n"
                   f"🗓️ *Mulai Sejak:* `{start_date_clean}`\n"
                   f"📝 *Total Entri:* `{total_entries} kali`\n"
-                  f"🔥 *Hari Aktif:* `{active_days} hari`\n"
+                  f"🔥 *Hari aktif:* `{active_days} hari`\n"
                   f"🏷️ *Kategori Favorit:* `{freq_text}`\n"
                   "━━━━━━━━━━━━━━━\n"
                   f"_{pesan_motivasi}_")
@@ -181,7 +200,7 @@ def get_report(period , user_id):
         (user_id,)
         )
         rows = c.fetchall()
-        title = "📅 *REKAP HARIAN*"
+        title = "📅 *REKAP HARI INI*"
         date = datetime.now().strftime('%d %B %Y')
         report_text = f"{title}\n{date}\n━━━━━━━━━━━━━━━\n"
         total = sum(item[1] for item in rows)
@@ -196,7 +215,7 @@ def get_report(period , user_id):
         (user_id,)
         )
         rows = c.fetchall()
-        title = "📊 *REKAP BULANAN*"
+        title = "📊 *REKAP BULAN INI*"
         date = datetime.now().strftime('%B %Y')
         report_text = f"{title}\n{date}\n━━━━━━━━━━━━━━━\n"
         total = sum(item[1] for item in rows)
@@ -210,5 +229,7 @@ def get_report(period , user_id):
     conn.close()
     if not rows: return f"{title}\n\nBelum ada data."
     report_text += f"━━━━━━━━━━━━━━━\n💰 *TOTAL: Rp {total:,.0f}*"
+    motivasi = random.choice(MOTIVASI_BANK)
+    report_text += "\n\n_" + motivasi + "_"
     return report_text
         
