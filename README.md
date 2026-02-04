@@ -61,15 +61,18 @@ Untuk menjaga chat tetap bersih, gunakan "Auto-Delete Messages":
 ```plaintext
 
 ├── src/
-│   ├── bot.py         # Logika utama bot & scheduler
-├── data/              # Persistent storage (finance.db & CSV)
-├── Dockerfile        # Definisi image container (Alpine based)
-└── docker-compose.yml
+│   ├── bot.py         # Inisialisasi dan handler perintah
+│   ├── functions.py   # Fungsi-fungsi utama
+│   ├── scheduler.py   # Scheduler untuk reminder
+│   └── database.py    # Koneksi database
+├── data/              # Persistent storage (finance.db)
+├── Dockerfile         # Definisi image container (Alpine based)
+└── docker-compose.yml # Definisi container
 ```
 
-## 🤝 Kontribusi
-****
-Bot ini dibuat untuk penggunaan pribadi yang praktis. Jika kamu punya ide fitur atau menemukan bug, silakan buka Issue atau kirimkan Pull Request.
+## 🤝 Catatan
+
+Bot ini dibuat untuk penggunaan pribadi, jika ingin menjalankan sendiri, silahkan ikuti langkah-langkah di atas.
 
 
 
