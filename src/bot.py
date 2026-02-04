@@ -60,10 +60,16 @@ def insight(message):
 @bot.message_handler(commands=['rekap'])
 def rekap_menu(message):
     markup = types.InlineKeyboardMarkup()
+    text = (
+        "📊 *Intip progres keuanganmu, yuk!*\n\n"
+        "Kamu ingin melihat rangkuman pengeluaran yang mana?"
+    )
     markup.add(
-        types.InlineKeyboardButton("Hari Ini", callback_data='rekap_daily'),
-        types.InlineKeyboardButton("Bulan Ini", callback_data='rekap_monthly'))
-    bot.reply_to(message, "Pilih periode:", reply_markup=markup)
+        types.InlineKeyboardButton("📅 Hari Ini", callback_data='rekap_daily'),
+        types.InlineKeyboardButton("🗓️ Bulan Ini", callback_data='rekap_monthly')
+    )
+
+    bot.reply_to(message, text, reply_markup=markup, parse_mode="Markdown")
 
 @bot.message_handler(commands=['export'])
 def export_data(message):

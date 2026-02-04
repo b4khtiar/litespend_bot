@@ -92,9 +92,21 @@ def get_weekly_insight_logic(user_id):
     this_week_total = c.fetchone()[0] or 0
     c.execute("SELECT SUM(amount) FROM transactions WHERE date >= date('now', '-14 days') AND date < date('now', '-7 days') AND user_id=?", (user_id,))
     last_week_total = c.fetchone()[0] or 0
-
+    
+    if this_week_total == 0 and last_week_total == 0:
+        conn.close()
+        return "Belum ada data pengeluaran minggu ini."
+    
+    # find top 3 categories
+    c.execute("SELECT category, COUNT(*) as count FROM transactions WHERE date >= date('now', '-7 days') AND user_id=? GROUP BY category ORDER BY count DESC LIMIT 3", (user_id,))
+    top_categories = c.fetchall()
+    
     diff = this_week_total - last_week_total
-    diff_percent = diff / last_week_total * 100 if last_week_total > 0 else 0
+    diff_percent = 0
+    if last_week_total > 0:
+        # buat persentase (absolut dan bulatkan tanpa desimal)
+        diff_percent = round(abs(diff / last_week_total * 100))
+
     status = "Stabil"
     suggestion = "Pengeluaranmu minggu ini stabil banget! ⚖️ Ini tanda kamu sudah punya kontrol yang matang atas gaya hidupmu. Predictable is good! 👏"
     if diff > 0:
@@ -104,11 +116,17 @@ def get_weekly_insight_logic(user_id):
         status = "🟢 Turun " + str(diff_percent) + "%"
         suggestion = "Lihat deh angkanya... lebih hijau! 🍏 Kamu sukses mengendalikan godaan minggu ini. Pertahankan konsistensinya ya!"
     
-    insight_text = (f"📅 *Weekly Financial Insight*\n"
-                    "Halo! Seminggu ini kamu luar biasa tetap konsisten mencatat. Inilah rangkuman perjalanan uangmu:\n"
-                    f"💰 Total Pengeluaran: `Rp {this_week_total:,.0f}` ({status})\n\n"
-                    f"💡 {suggestion}"
-                )
+    insight_text = (f"📅 *Weekly Financial Insight*\n\n"
+                    "Halo! Seminggu ini kamu luar biasa tetap konsisten mencatat. Inilah rangkuman perjalanan uangmu:\n\n"
+                    f"💰 *Total Pengeluaran*: `Rp {this_week_total:,.0f}` ({status} dari pekan lalu.)\n\n"
+                    f"📊 *Top Kategori*\n")
+    # add category with count (only top 3 count)
+    top_3_categories = top_categories[:3]
+    for category, count in top_3_categories:
+        insight_text += f"- {category}: {count}x\n"
+
+    insight_text += f"\n💡 {suggestion}"
+                
 
     # 3. Simpan hasil kalkulasi ke tabel insights agar minggu depan tidak hitung lagi
     c.execute("""INSERT INTO insights (user_id, period_type, period_date, total_amount, trend_percent, insight_text) 
@@ -140,8 +158,11 @@ def get_stats_logic(user_id):
     if not total_entries:
         return "Belum ada statistik. Yuk, mulai mencatat!"
 
-    # Bersihkan tampilan tanggal
-    start_date_clean = start_date.split()[0] if start_date else "-"
+    # Bersihkan tampilan tanggal (hilangkan waktu & format %d %B %Y)
+    start_date_clean = "-"
+    if start_date:
+        start_date_strip = start_date.split()[0]
+        start_date_clean = datetime.strptime(start_date_strip, "%Y-%m-%d").strftime("%d %B %Y")
     freq_text = f"{most_freq[0]} ({most_freq[1]}x)" if most_freq else "-"
 
     # Ambil motivasi random
