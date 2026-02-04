@@ -1,34 +1,23 @@
 import telebot
-import sqlite3
-import re
 import os
-import threading
-import csv
 from telebot import types
+import database
+import functions
+import scheduler
 
-# --- IMPORT FUNGSI DATABASE ---
-from database import (
-    init_db, save_to_db, get_report, get_last_transaction, delete_last_transaction, get_user_stats,
-    get_all_transactions, get_transactions_today
-)
-
-
-# --- KONFIGURASI ---
 TOKEN = os.environ.get('TOKEN')
 ALLOWED_ID = int(os.environ.get('ALLOWED_ID', 0))
-DB_PATH = os.path.join(os.getcwd(), 'data', 'finance.db')
+
 bot = telebot.TeleBot(TOKEN)
-user_data = {}
 
-
-# --- BOT HANDLERS ---
+# Jangan merespon user selain allowed_id
 @bot.message_handler(func=lambda message: message.from_user.id != ALLOWED_ID)
-def unauthorized(message):
-    bot.reply_to(message, "❌ Akses ditolak.")
-
+def unauthorized():
+    return
 
 @bot.message_handler(commands=['start'])
-def send_welcome(message):
+def start(message):
+    if message.from_user.id != ALLOWED_ID: return
     first_name = message.from_user.first_name
     markup = types.InlineKeyboardMarkup(row_width=2)
     btn_rekap = types.InlineKeyboardButton("📊 Lihat Rekap",
@@ -50,11 +39,40 @@ def send_welcome(message):
                      parse_mode="Markdown",
                      reply_markup=markup)
 
+@bot.message_handler(commands=['stats'])
+def stats(message):
+    if message.from_user.id != ALLOWED_ID: return
+    user_id = message.from_user.id
+    text = functions.get_stats_logic(user_id)
+    bot.reply_to(message, text, parse_mode="Markdown")
+
+# Tambahkan handler lainnya (rekap, delete, export) di sini...
+@bot.message_handler(commands=['rekap'])
+def rekap_menu(message):
+    markup = types.InlineKeyboardMarkup()
+    markup.add(
+        types.InlineKeyboardButton("Hari Ini", callback_data='rekap_daily'),
+        types.InlineKeyboardButton("Bulan Ini", callback_data='rekap_monthly'))
+    bot.reply_to(message, "Pilih periode:", reply_markup=markup)
+
+@bot.message_handler(commands=['export'])
+def export_data(message):
+    if message.from_user.id != ALLOWED_ID: return
+    user_id = message.from_user.id
+    data = functions.get_export_logic(user_id)
+
+    if data is None:
+        bot.reply_to(message, "📊 Tidak ada data untuk diekspor.")
+        return
+    
+    text = f"📊 Ini data transaksimu dalam CSV:\n\n{data}"
+    bot.reply_to(message, text)
 
 @bot.message_handler(commands=['hapus'])
 def hapus_command(message):
-    data = get_last_transaction()
-    if data == "0":
+    user_id = message.from_user.id
+    data = functions.get_last_transaction(user_id)
+    if data is None:
         text = "❌ *Tidak ada data.*"
         bot.reply_to(message, text, parse_mode="Markdown")
         return
@@ -64,45 +82,9 @@ def hapus_command(message):
         types.InlineKeyboardButton("❌ Batal", callback_data='cancel_delete'))
     bot.reply_to(message, data, reply_markup=markup)
 
-
-@bot.message_handler(commands=['rekap'])
-def rekap_menu(message):
-    markup = types.InlineKeyboardMarkup()
-    markup.add(
-        types.InlineKeyboardButton("Hari Ini", callback_data='rekap_daily'),
-        types.InlineKeyboardButton("Bulan Ini", callback_data='rekap_monthly'))
-    bot.reply_to(message, "Pilih periode:", reply_markup=markup)
-
-
-@bot.message_handler(commands=['stats'])
-def stats_command(message):
-    bot.reply_to(message, get_user_stats(), parse_mode="Markdown")
-
-
-@bot.message_handler(commands=['export'])
-def export_csv(message):
-    file_path = 'data/export_keuangan.csv'
-    try:
-        rows = get_all_transactions()
-        if not rows:
-            bot.reply_to(message, "❌ Tidak ada data untuk diekspor.")
-            return
-
-        with open(file_path, 'w', newline='', encoding='utf-8') as f:
-            writer = csv.writer(f)
-            writer.writerow(['Tanggal', 'Kategori', 'Keterangan', 'Nominal'])
-            for row in rows:
-                clean_cat = re.sub(r'[^\x00-\x7F]+', '', row[1]).strip()
-                clean_cat = " ".join(clean_cat.split()).strip()
-                writer.writerow([row[0], clean_cat, row[2], row[3]])
-        with open(file_path, 'rb') as f:
-            bot.send_document(message.chat.id, f, caption="📂 Data Ekspor CSV")
-    except Exception as e:
-        bot.reply_to(message, f"❌ Gagal: {e}")
-
-
 @bot.callback_query_handler(func=lambda call: True)
 def handle_callbacks(call):
+    user_id = call.message.chat.id
     if call.data.startswith('rekap_'):
         period = call.data.replace('rekap_', '')
         bot.edit_message_text(get_report(period),
@@ -114,7 +96,7 @@ def handle_callbacks(call):
         category = call.data.replace("cat_", "")
         data = user_data.get(call.message.chat.id)
         if data:
-            if save_to_db(data['amount'], category, data['desc']):
+            if functions.save_transaction(data['amount'], category, data['desc'], user_id):
                 bot.edit_message_text(
                     f"✅ *Tersimpan!*\n💰 Rp {data['amount']:,}\n📝 {data['desc']}\n🏷️ {category}",
                     call.message.chat.id,
@@ -125,18 +107,25 @@ def handle_callbacks(call):
             bot.answer_callback_query(call.id, "Sesi habis, input ulang ya.")
 
     elif call.data == 'confirm_delete':
-        bot.edit_message_text(delete_last_transaction(),
+        deleted = functions.delete_last_transaction(user_id)
+        if deleted:
+            text = f"✅ *Entri terakhir dihapus!*"
+        else:
+            text = "❌ *Gagal menghapus entri terakhir.*"
+        bot.edit_message_text(text,
                               call.message.chat.id,
                               call.message.message_id,
                               parse_mode="Markdown")
 
     elif call.data == 'cancel_delete':
-        bot.edit_message_text("✅ Dibatalkan.", call.message.chat.id,
-                              call.message.message_id)
+        bot.edit_message_text(":leftwards_arrow_with_hook: Batal menghapus.", call.message.chat.id,
+                              call.message.message_id,
+                              parse_mode="Markdown")
 
 
 @bot.message_handler(func=lambda message: True)
 def handle_text(message):
+    user_id = message.chat.id
     match = re.search(r'(\d+)\s*(k|rb)?', message.text.lower())
     if match:
         nominal = int(match.group(1)) * (1000 if match.group(2) else 1)
@@ -159,19 +148,14 @@ def handle_text(message):
                      parse_mode="Markdown")
     else:
         bot.reply_to(message,
-                     "❓ Format: `NamaBarang Harga` (Contoh: Kopi 15k)")
-
-# SCHEDULED REMINDER
-def check_and_remind():
-    rows = get_transactions_today()
-    if len(rows) == 0:
-        bot.send_message(
-            ALLOWED_ID,
-            "🔔 *Reminder:* Kamu belum mencatat pengeluaran hari ini!",
-            parse_mode="Markdown")
-
+                     "❓ Format salah, gunakan `NamaBarang Harga` (Contoh: Kopi 15k)",
+                     parse_mode="Markdown")
 
 if __name__ == "__main__":
-    init_db()
-    threading.Thread(target=run_scheduler, daemon=True).start()
+    database.init_db()
+    
+    # Jalankan scheduler dengan mempassing objek 'bot'
+    scheduler.start_scheduler_thread(bot, ALLOWED_ID)
+    
+    print("Bot LiteSpend is running...")
     bot.polling(none_stop=True)
