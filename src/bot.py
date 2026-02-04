@@ -4,6 +4,8 @@ from telebot import types
 import database
 import functions
 import scheduler
+import io
+from datetime import datetime
 
 TOKEN = os.environ.get('TOKEN')
 ALLOWED_ID = int(os.environ.get('ALLOWED_ID', 0))
@@ -59,14 +61,26 @@ def rekap_menu(message):
 def export_data(message):
     if message.from_user.id != ALLOWED_ID: return
     user_id = message.from_user.id
-    data = functions.get_export_logic(user_id)
-
-    if data is None:
-        bot.reply_to(message, "📊 Tidak ada data untuk diekspor.")
-        return
+    # Panggil fungsi dari functions.py
+    csv_buffer = functions.generate_csv_export(user_id)
     
-    text = f"📊 Ini data transaksimu dalam CSV:\n\n{data}"
-    bot.reply_to(message, text)
+    if csv_buffer is None:
+        bot.reply_to(message, "❌ Kamu belum memiliki data transaksi untuk diekspor.")
+        return
+
+    # Kirim sebagai dokumen
+    try:
+        # Mengubah StringIO (teks) ke BytesIO (biner) agar bisa dikirim sebagai file
+        bio = io.BytesIO(csv_buffer.getvalue().encode('utf-8'))
+        bio.name = f"Litespend_Export_{user_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        
+        bot.send_document(
+            message.chat.id, 
+            bio, 
+            caption="📂 Ini adalah file laporan pengeluaranmu."
+        )
+    except Exception as e:
+        bot.reply_to(message, f"❌ Terjadi kesalahan saat mengirim file: {e}")
 
 @bot.message_handler(commands=['hapus'])
 def hapus_command(message):
@@ -87,7 +101,8 @@ def handle_callbacks(call):
     user_id = call.message.chat.id
     if call.data.startswith('rekap_'):
         period = call.data.replace('rekap_', '')
-        bot.edit_message_text(get_report(period),
+        report_data = functions.get_report(period, user_id)
+        bot.edit_message_text(report_data,
                               call.message.chat.id,
                               call.message.message_id,
                               parse_mode="Markdown")

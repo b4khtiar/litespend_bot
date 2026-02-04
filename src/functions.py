@@ -1,6 +1,9 @@
 from database import get_db_connection
 import random
 from datetime import datetime
+import io
+import re
+import csv
 
 MOTIVASI_BANK = [
     "Hemat hari ini, tenang di masa depan. 💰",
@@ -31,6 +34,17 @@ def get_last_transaction(user_id):
     conn.close()
     return data
 
+def get_transactions_today(user_id):
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute(
+        "SELECT description, amount FROM transactions WHERE date(date, '+7 hours') = date('now', '+7 hours') AND user_id=?",
+        (user_id,)
+    )
+    rows = c.fetchall()
+    conn.close()
+    return rows
+
 def delete_last_transaction(user_id):
     conn = get_db_connection()
     c = conn.cursor()
@@ -39,7 +53,7 @@ def delete_last_transaction(user_id):
     conn.close()
     return True
 
-def check_remind_needed(user_id):
+def check_and_remind_logic(user_id):
     conn = get_db_connection()
     c = conn.cursor()
     # Gunakan +7 hours jika server UTC tapi ingin hitung hari WIB
@@ -90,28 +104,111 @@ def get_weekly_insight_logic(user_id):
 def get_stats_logic(user_id):
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("SELECT COUNT(*), MIN(datetime(date, '+7 hours')) FROM transactions WHERE user_id=?", (user_id,))
-    res = c.fetchone()
-    conn.close()
-    
-    motivasi = random.choice(MOTIVASI_BANK)
-    return f"📈 *STATISTIK*\nTotal Input: `{res[0]}`\nMencatat sejak: `{res[1]}`\n\n_{motivasi}_"
+    c.execute(
+        "SELECT COUNT(*), MIN(datetime(date, '+7 hours')) FROM transactions WHERE user_id=?", (user_id,)
+    )
+    total_entries, start_date = c.fetchone()
 
-def get_export_logic(user_id):
+    c.execute(
+        "SELECT category, COUNT(category) as count FROM transactions WHERE user_id=? GROUP BY category ORDER BY count DESC LIMIT 1", (user_id,)
+    )
+    most_freq = c.fetchone()
+
+    c.execute("SELECT COUNT(DISTINCT date(date)) FROM transactions WHERE user_id=?", (user_id,))
+    active_days = c.fetchone()[0]
+    conn.close()
+
+    if not total_entries:
+        return "Belum ada statistik. Yuk, mulai mencatat!"
+
+    # Bersihkan tampilan tanggal
+    start_date_clean = start_date.split()[0] if start_date else "-"
+    freq_text = f"{most_freq[0]} ({most_freq[1]}x)" if most_freq else "-"
+
+    # Ambil motivasi random
+    pesan_motivasi = random.choice(MOTIVASI_BANK)
+
+    stats_text = ("📈 *STATISTIK PENGGUNAAN*\n"
+                  "━━━━━━━━━━━━━━━\n"
+                  f"🗓️ *Mulai Sejak:* `{start_date_clean}`\n"
+                  f"📝 *Total Entri:* `{total_entries} kali`\n"
+                  f"🔥 *Hari Aktif:* `{active_days} hari`\n"
+                  f"🏷️ *Kategori Favorit:* `{freq_text}`\n"
+                  "━━━━━━━━━━━━━━━\n"
+                  f"_{pesan_motivasi}_")
+    return stats_text
+
+def generate_csv_export(user_id):
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("SELECT * FROM transactions WHERE user_id=?", (user_id,))
+    
+    # Ambil data spesifik user dengan waktu WIB
+    query = """
+        SELECT datetime(date, '+7 hours'), category, description, amount 
+        FROM transactions 
+        WHERE user_id = ? 
+        ORDER BY date DESC
+    """
+    c.execute(query, (user_id,))
     rows = c.fetchall()
     conn.close()
-    
+
     if not rows:
         return None
-    
-    # Buat CSV
-    import csv
-    from io import StringIO
-    output = StringIO()
+
+    # Buat buffer di memori
+    output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["ID", "Tanggal", "Kategori", "Deskripsi", "Jumlah", "User ID"])
-    writer.writerows(rows)
-    return output.getvalue()
+    writer.writerow(['Tanggal', 'Kategori', 'Keterangan', 'Nominal'])
+    
+    for row in rows:
+        # Pembersihan kategori dari emoji dan spasi ganda
+        clean_cat = re.sub(r'[^\x00-\x7F]+', '', row[1])
+        clean_cat = " ".join(clean_cat.split()).strip()
+        writer.writerow([row[0], clean_cat, row[2], row[3]])
+    
+    # Kembalikan pointer ke awal file virtual
+    output.seek(0)
+    return output
+
+def get_report(period , user_id):
+    conn = get_db_connection()
+    c = conn.cursor()
+    
+    if period == 'daily':
+        c.execute(
+        "SELECT description, amount FROM transactions WHERE date(date, '+7 hours') = date('now', '+7 hours') AND user_id=?",
+        (user_id,)
+        )
+        rows = c.fetchall()
+        title = "📅 *REKAP HARIAN*"
+        date = datetime.now().strftime('%d %B %Y')
+        report_text = f"{title}\n{date}\n━━━━━━━━━━━━━━━\n"
+        total = sum(item[1] for item in rows)
+        for desc, amount in rows:
+            report_text += f"• {desc}: `Rp {amount:,.0f}`\n"
+    else:
+        c.execute(
+        """SELECT category, SUM(amount) as total 
+                   FROM transactions 
+                   WHERE strftime('%m-%Y', date, '+7 hours') = strftime('%m-%Y', 'now', '+7 hours') AND user_id=?
+                   GROUP BY category ORDER BY total DESC""",
+        (user_id,)
+        )
+        rows = c.fetchall()
+        title = "📊 *REKAP BULANAN*"
+        date = datetime.now().strftime('%B %Y')
+        report_text = f"{title}\n{date}\n━━━━━━━━━━━━━━━\n"
+        total = sum(item[1] for item in rows)
+
+        for cat, amount in rows:
+            porsi = (amount / total) * 100 if total > 0 else 0
+            bar = "┃" + "█" * int(
+                porsi / 10) + "░" * (10 - int(porsi / 10)) + "┃"
+            report_text += f"*{cat}*\n`Rp {amount:>10,.0f}` {bar} {porsi:>3.0f}%\n"
+
+    conn.close()
+    if not rows: return f"{title}\n\nBelum ada data."
+    report_text += f"━━━━━━━━━━━━━━━\n💰 *TOTAL: Rp {total:,.0f}*"
+    return report_text
+        
