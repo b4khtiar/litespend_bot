@@ -9,7 +9,7 @@ from telebot import types
 # --- IMPORT FUNGSI DATABASE ---
 from database import (
     init_db, save_to_db, get_report, get_last_transaction, delete_last_transaction, get_user_stats,
-    get_all_transactions
+    get_all_transactions, get_transactions_today
 )
 
 
@@ -87,7 +87,7 @@ def export_csv(message):
         if not rows:
             bot.reply_to(message, "❌ Tidak ada data untuk diekspor.")
             return
-            
+
         with open(file_path, 'w', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
             writer.writerow(['Tanggal', 'Kategori', 'Keterangan', 'Nominal'])
@@ -160,6 +160,15 @@ def handle_text(message):
     else:
         bot.reply_to(message,
                      "❓ Format: `NamaBarang Harga` (Contoh: Kopi 15k)")
+
+# SCHEDULED REMINDER
+def check_and_remind():
+    rows = get_transactions_today()
+    if len(rows) == 0:
+        bot.send_message(
+            ALLOWED_ID,
+            "🔔 *Reminder:* Kamu belum mencatat pengeluaran hari ini!",
+            parse_mode="Markdown")
 
 
 if __name__ == "__main__":

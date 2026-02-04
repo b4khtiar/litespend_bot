@@ -46,28 +46,43 @@ def save_to_db(amount, category, desc):
         print(f"DATABASE ERROR: {e}")
         return False
 
+def get_transactions_today():
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute(
+        "SELECT description, amount FROM transactions WHERE date(date, '+7 hours') = date('now', '+7 hours')"
+    )
+    rows = c.fetchall()
+    conn.close()
+    return rows
+
+def get_transactions_this_month():
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute(
+        """SELECT category, SUM(amount) as total 
+                   FROM transactions 
+                   WHERE strftime('%m-%Y', date, '+7 hours') = strftime('%m-%Y', 'now', '+7 hours')
+                   GROUP BY category ORDER BY total DESC"""
+    )
+    rows = c.fetchall()
+    conn.close()
+    return rows
 
 def get_report(period='daily'):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 
     if period == 'daily':
-        query = "SELECT description, amount FROM transactions WHERE date(date, '+7 hours') = date('now', '+7 hours')"
+        rows = get_transactions_today()
         title = "📅 *REKAP HARIAN*"
-        c.execute(query)
-        rows = c.fetchall()
         report_text = f"{title}\n━━━━━━━━━━━━━━━\n"
         total = sum(item[1] for item in rows)
         for desc, amount in rows:
             report_text += f"• {desc}: `Rp {amount:,.0f}`\n"
     else:
-        query = """SELECT category, SUM(amount) as total 
-                   FROM transactions 
-                   WHERE strftime('%m-%Y', date, '+7 hours') = strftime('%m-%Y', 'now', '+7 hours')
-                   GROUP BY category ORDER BY total DESC"""
         title = "📊 *REKAP BULANAN*"
-        c.execute(query)
-        rows = c.fetchall()
+        rows = get_transactions_this_month()
         report_text = f"{title}\n━━━━━━━━━━━━━━━\n"
         total = sum(item[1] for item in rows)
 
@@ -166,18 +181,3 @@ def get_all_transactions():
     rows = c.fetchall()
     conn.close()
     return rows
-
-def check_and_remind():
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute(
-        "SELECT COUNT(*) FROM transactions WHERE date(date, '+7 hours') = date('now', '+7 hours')"
-    )
-    count = c.fetchone()[0]
-    conn.close()
-    if count == 0:
-        bot.send_message(
-            ALLOWED_ID,
-            "🔔 *Reminder:* Kamu belum mencatat pengeluaran hari ini!",
-            parse_mode="Markdown")
-
