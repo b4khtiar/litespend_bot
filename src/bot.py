@@ -103,14 +103,15 @@ def hapus_command(message):
     user_id = message.from_user.id
     data = functions.get_last_transaction(user_id)
     if data is None:
-        text = "❌ *Tidak ada data.*"
+        text = "❌ *Tidak ada transaksi, silakan input dulu!*"
         bot.reply_to(message, text, parse_mode="Markdown")
         return
     markup = types.InlineKeyboardMarkup()
     markup.add(
         types.InlineKeyboardButton("🗑️ Hapus", callback_data='confirm_delete'),
         types.InlineKeyboardButton("❌ Batal", callback_data='cancel_delete'))
-    bot.reply_to(message, data, reply_markup=markup)
+    item_text = f"❓ Yakin hapus {data['description']} - Rp {data['amount']:,}?"
+    bot.reply_to(message, item_text, reply_markup=markup)
 
 @bot.callback_query_handler(func=lambda call: True)
 def handle_callbacks(call):
@@ -128,8 +129,16 @@ def handle_callbacks(call):
         data = user_data.get(user_id)
         if data:
             if functions.save_transaction(data['amount'], category, data['desc'], user_id):
+                # update streak functionality
+                streak, show_congrats = functions.update_streak(user_id)
+
+                text = f"✅ **{data['desc']}** senilai **Rp {data['amount']:,}** masuk ke kategori **{category}**. 🔥`{streak}`"
+                if show_congrats:
+                    milestone = functions.get_milestone(streak)
+                    text += f"\n\n{milestone}"
+
                 bot.edit_message_text(
-                    f"✅ **{data['desc']}** senilai **Rp {data['amount']:,}** masuk ke kategori **{category}**.",
+                    text,
                     call.message.chat.id,
                     call.message.message_id,
                     parse_mode="Markdown")
@@ -140,16 +149,16 @@ def handle_callbacks(call):
     elif call.data == 'confirm_delete':
         deleted = functions.delete_last_transaction(user_id)
         if deleted:
-            text = "🗑️ *Terhapus!* Data terakhir sudah dibersihkan. Input ulang jika ingin memperbaiki."
+            text = "🗑️ *Transaksi terakhir dihapus!*\nSilakan input ulang jika ingin memperbaiki."
         else:
-            text = "❌ *Gagal.* Kamu belum menginput data apa pun hari ini."
+            text = "❌ *Gagal!*\nKamu belum menginput data apa pun hari ini."
         bot.edit_message_text(text,
                               call.message.chat.id,
                               call.message.message_id,
                               parse_mode="Markdown")
 
     elif call.data == 'cancel_delete':
-        bot.edit_message_text(":leftwards_arrow_with_hook: Batal menghapus.", call.message.chat.id,
+        bot.edit_message_text("\n❌ Batal menghapus transaksi.", call.message.chat.id,
                               call.message.message_id,
                               parse_mode="Markdown")
 
@@ -192,7 +201,7 @@ if __name__ == "__main__":
     database.init_db()
     
     # Jalankan scheduler dengan mempassing objek 'bot'
-    scheduler.start_scheduler_thread(bot, ALLOWED_ID)
+    scheduler.start_scheduler_thread(bot, ALLOWED_ID, functions)
     
     print("Bot LiteSpend is running...")
     bot.polling(none_stop=True)

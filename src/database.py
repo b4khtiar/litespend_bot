@@ -20,10 +20,7 @@ def init_db():
                   description TEXT,
                   date TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
 
-    # Menambahkan Index untuk user_id agar pencarian lebih cepat
     c.execute('CREATE INDEX IF NOT EXISTS idx_user_id ON transactions(user_id)')
-    
-    # (Opsional) Index untuk tanggal juga sangat disarankan karena kita sering query berdasarkan waktu
     c.execute('CREATE INDEX IF NOT EXISTS idx_date ON transactions(date)')
 
     c.execute('''CREATE TABLE IF NOT EXISTS insights
@@ -35,5 +32,19 @@ def init_db():
                   trend_percent REAL,
                   insight_text TEXT,
                   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+
+    c.execute('''CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_insight 
+                 ON insights (user_id, period_type, period_date)''')
+    
+    c.execute('''CREATE TABLE IF NOT EXISTS user_stats
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  user_id INTEGER,
+                  current_streak INTEGER DEFAULT 0,
+                  longest_streak INTEGER DEFAULT 0,
+                  first_input_date TEXT,
+                  total_days INTEGER DEFAULT 0,
+                  last_input_date TEXT,
+                  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+    
     conn.commit()
     conn.close()

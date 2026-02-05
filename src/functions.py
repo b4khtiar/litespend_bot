@@ -1,9 +1,11 @@
 from database import get_db_connection
 import random
-from datetime import datetime
+from datetime import datetime, timedelta
 import io
 import re
 import csv
+from dateutil.relativedelta import relativedelta
+
 
 MOTIVASI_BANK = [
     "Uangmu adalah hasil kerja kerasmu, hargai dengan mencatatnya. 💪",
@@ -37,9 +39,17 @@ def get_last_transaction(user_id):
     conn = get_db_connection()
     c = conn.cursor()
     c.execute("SELECT * FROM transactions WHERE user_id=? ORDER BY id DESC LIMIT 1", (user_id,))
-    data = c.fetchone()
+    data = c.fetchone()[0]
     conn.close()
-    return data
+    item = {
+        "id": data[0],
+        "user_id": data[1],
+        "amount": data[2],
+        "category": data[3],
+        "description": data[4],
+        "date": data[5]
+    }
+    return item
 
 def get_transactions_today(user_id):
     conn = get_db_connection()
@@ -53,9 +63,12 @@ def get_transactions_today(user_id):
     return rows
 
 def delete_last_transaction(user_id):
+    item = get_last_transaction(user_id)
+    if item is None:
+        return False
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("DELETE FROM transactions WHERE user_id=? ORDER BY id DESC LIMIT 1", (user_id,))
+    c.execute("DELETE FROM transactions WHERE id=?", (item['id'],))
     conn.commit()
     conn.close()
     return True
@@ -72,7 +85,7 @@ def check_and_remind_logic(user_id):
         return True
     return False
 
-def get_weekly_insight_logic(user_id):
+def get_weekly_insight_logic(user_id, is_archive=False):
     # Ambil penanda minggu ini (Contoh: '2023-42' untuk tahun 2023 minggu ke-42)
     current_period = datetime.now().strftime('%Y-%U')
     
@@ -87,7 +100,7 @@ def get_weekly_insight_logic(user_id):
         conn.close()
         return existing[0] + "\n\n_(Diambil dari arsip)_"
 
-    # 2. Jika tidak ada, jalankan kalkulasi berat seperti sebelumnya
+    # 2. Jika tidak ada, jalankan kalkulasi
     c.execute("SELECT SUM(amount) FROM transactions WHERE date >= date('now', '-7 days') AND user_id=?", (user_id,))
     this_week_total = c.fetchone()[0] or 0
     c.execute("SELECT SUM(amount) FROM transactions WHERE date >= date('now', '-14 days') AND date < date('now', '-7 days') AND user_id=?", (user_id,))
@@ -128,41 +141,121 @@ def get_weekly_insight_logic(user_id):
     insight_text += f"\n💡 {suggestion}"
                 
 
-    # 3. Simpan hasil kalkulasi ke tabel insights agar minggu depan tidak hitung lagi
-    c.execute("""INSERT INTO insights (user_id, period_type, period_date, total_amount, trend_percent, insight_text) 
-                 VALUES (?, ?, ?, ?, ?, ?)""", 
-              (user_id, 'weekly', current_period, this_week_total, diff_percent, insight_text))
-    
+    if is_archive:
+        c.execute("""INSERT INTO insights (user_id, period_type, period_date, total_amount, trend_percent, insight_text) 
+                     VALUES (?, ?, ?, ?, ?, ?)""", 
+                  (user_id, 'weekly', current_period, this_week_total, diff_percent, insight_text))    
     conn.commit()
     conn.close()
     
+    return insight_text
+
+def get_monthly_insight_logic(user_id, is_archive=False):
+    now = datetime.now()
+    current_period = now.strftime('%Y-%m')
+    
+    # Cara paling aman menghitung bulan lalu (termasuk ganti tahun)
+    last_month_date = now - relativedelta(months=1)
+    previous_period = last_month_date.strftime('%Y-%m')
+    
+    day_today = now.day
+
+    conn = get_db_connection()
+    c = conn.cursor()
+    
+    # 1. Cek cache insight bulan ini
+    c.execute("""SELECT insight_text FROM insights 
+                 WHERE period_type='monthly' AND period_date=? AND user_id=?""", 
+              (current_period, user_id))
+    existing = c.fetchone()
+    if existing:
+        conn.close()
+        return existing[0] + "\n\n_(Arsip)_"
+
+    # 2. Hitung total bulan ini (Gunakan format YYYY-MM agar index idx_date terpakai)
+    c.execute("""SELECT SUM(amount) FROM transactions 
+                 WHERE strftime('%Y-%m', date, '+7 hours') = ? AND user_id=?""", 
+              (current_period, user_id))
+    this_month_total = c.fetchone()[0] or 0
+
+    if this_month_total == 0:
+        conn.close()
+        return "Bulan ini belum ada catatan. Yuk, mulai catat! ✨"
+
+    # 3. Top Category
+    c.execute("""
+        SELECT category, SUM(amount) as total_cat 
+        FROM transactions 
+        WHERE strftime('%Y-%m', date, '+7 hours') = ? AND user_id=?
+        GROUP BY category 
+        ORDER BY total_cat DESC LIMIT 1
+    """, (current_period, user_id))
+    top_cat_data = c.fetchone()
+    top_category = top_cat_data[0] if top_cat_data else "Lainnya"
+
+    # 4. Ambil data bulan lalu dari tabel INSIGHTS (Bukan hitung ulang tabel transaksi)
+    c.execute("""SELECT total_amount FROM insights 
+                 WHERE period_type='monthly' AND period_date=? AND user_id=?""", 
+              (previous_period, user_id))
+    prev_data = c.fetchone()
+
+    # --- KONSTRUKSI TEKS ---
+    insight_text = f"📊 *Ringkasan {now.strftime('%B %Y')}*\n━━━━━━━━━━━━━━━\n\n"
+    diff_percent = 0
+    daily_avg = round(this_month_total / day_today)
+
+    if prev_data:
+        previous_total = prev_data[0]
+        diff = this_month_total - previous_total
+        if previous_total > 0:
+            diff_percent = round(abs(diff / previous_total * 100))
+        
+        status = "Stabil"
+        if diff > 0: status = f"🔴 Naik {diff_percent}%"
+        elif diff < 0: status = f"🟢 Turun {diff_percent}%"
+        
+        insight_text += f"Total pengeluaran *Rp {this_month_total:,.0f}*, {status} dari bulan lalu.\n"
+    else:
+        insight_text += f"Bulan pertamamu! Total: *Rp {this_month_total:,.0f}*.\n"
+
+    insight_text += (
+        f"\n📍 *Insight:*\n"
+        f"• Terbanyak: *{top_category}*\n"
+        f"• Rata-rata harian: *Rp {daily_avg:,.0f}*\n\n"
+        f"💡 _Tips: Jaga pengeluaran di {top_category} agar bulan depan lebih hemat!_"
+    )
+
+    if is_archive:
+        c.execute("""INSERT INTO insights (user_id, period_type, period_date, total_amount, trend_percent, insight_text) 
+                     VALUES (?, ?, ?, ?, ?, ?)""", 
+                  (user_id, 'monthly', current_period, this_month_total, diff_percent, insight_text))
+    
+    conn.commit()
+    conn.close()
     return insight_text
 
 def get_stats_logic(user_id):
     conn = get_db_connection()
     c = conn.cursor()
     c.execute(
-        "SELECT COUNT(*), MIN(datetime(date, '+7 hours')) FROM transactions WHERE user_id=?", (user_id,)
-    )
-    total_entries, start_date = c.fetchone()
-
-    c.execute(
         "SELECT category, COUNT(category) as count FROM transactions WHERE user_id=? GROUP BY category ORDER BY count DESC LIMIT 1", (user_id,)
     )
     most_freq = c.fetchone()
-
-    c.execute("SELECT COUNT(DISTINCT date(date)) FROM transactions WHERE user_id=?", (user_id,))
-    active_days = c.fetchone()[0]
     conn.close()
 
-    if not total_entries:
+    if not most_freq:
         return "Belum ada statistik. Yuk, mulai mencatat!"
 
+    stats = get_user_stats(user_id)
     # Bersihkan tampilan tanggal (hilangkan waktu & format %d %B %Y)
     start_date_clean = "-"
-    if start_date:
-        start_date_strip = start_date.split()[0]
+    if stats['first_input_date']:
+        start_date_strip = stats['first_input_date'].split()[0]
         start_date_clean = datetime.strptime(start_date_strip, "%Y-%m-%d").strftime("%d %B %Y")
+    last_date_clean = "hari ini"  # sementara
+    if stats['last_input_date']:
+        last_date_strip = stats['last_input_date'].split()[0]
+        last_date_clean = datetime.strptime(last_date_strip, "%Y-%m-%d").strftime("%d %B %Y")
     freq_text = f"{most_freq[0]} ({most_freq[1]}x)" if most_freq else "-"
 
     # Ambil motivasi random
@@ -171,9 +264,11 @@ def get_stats_logic(user_id):
     stats_text = ("📈 *STATISTIK PENGGUNAAN*\n"
                   "━━━━━━━━━━━━━━━\n"
                   f"🗓️ *Mulai Sejak:* `{start_date_clean}`\n"
-                  f"📝 *Total Entri:* `{total_entries} kali`\n"
-                  f"🔥 *Hari aktif:* `{active_days} hari`\n"
-                  f"🏷️ *Kategori Favorit:* `{freq_text}`\n"
+                  f"📅 *Terakhir Mencatat:* `{last_date_clean}`\n"
+                  f"✅ *Aktif Mencatat:* `{stats['total_days']} hari`\n"
+                  f"🔥 *Streak:* `{stats['current_streak']} hari`\n"
+                  f"🏆 *Rekor:* `{stats['longest_streak']} hari`\n"
+                  f"🏷️ *Top Kategori:* `{freq_text}`\n"
                   "━━━━━━━━━━━━━━━\n"
                   f"_{pesan_motivasi}_")
     return stats_text
@@ -253,4 +348,90 @@ def get_report(period , user_id):
     motivasi = random.choice(MOTIVASI_BANK)
     report_text += "\n\n_" + motivasi + "_"
     return report_text
-        
+
+def get_user_stats(user_id):
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT current_streak, longest_streak, first_input_date, total_days, last_input_date FROM user_stats WHERE user_id=?", (user_id,))
+    row = c.fetchone()
+    conn.close()
+    if row:
+        return {
+            'current_streak': row[0],
+            'longest_streak': row[1],
+            'first_input_date': row[2],
+            'total_days': row[3],
+            'last_input_date': row[4]
+        }
+    return None
+
+def save_user_stats(user_id, new_streak, new_longest, new_active, input_date):
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("UPDATE user_stats SET current_streak=?, longest_streak=?, total_days=?, last_input_date=? WHERE user_id=?",
+              (new_streak, new_longest, new_active, input_date, user_id))
+    conn.commit()
+    conn.close()
+
+def create_user_stats(user_id):
+    conn = get_db_connection()
+    c = conn.cursor()
+    date_today = datetime.now().date()
+    c.execute(
+        "SELECT COUNT(*), MIN(datetime(date, '+7 hours')) FROM transactions WHERE user_id=?", (user_id,)
+    )
+    total_entries, start_date = c.fetchone()
+    c.execute("SELECT COUNT(DISTINCT date(date)) FROM transactions WHERE user_id=?", (user_id,))
+    active_days = c.fetchone()[0]
+    
+    c.execute("INSERT INTO user_stats (user_id, current_streak, longest_streak, total_days, first_input_date, last_input_date) VALUES (?, ?, ?, ?, ?, ?)",
+              (user_id, active_days, active_days, active_days, start_date, date_today))
+    conn.commit()
+    conn.close()
+    return active_days
+
+def update_streak(user_id):
+    today = datetime.now().date()
+    yesterday = today - timedelta(days=1)
+    
+    # Ambil data streak user
+    stats = get_user_stats(user_id) # {current_streak, last_input_date}
+    if stats == None:
+        start_streak = create_user_stats(user_id)
+        return start_streak, False
+    
+    last_date = stats['last_input_date']
+    current_s = stats['current_streak']
+    new_active = stats['total_days'] + 1
+    if last_date == today:
+        return current_s, False # Sudah update hari ini
+    
+    if last_date == yesterday:
+        new_streak = current_s + 1
+        show_congrats = True if new_streak in [3, 7, 10, 30, 60, 100, 180, 365, 500, 730, 1000] else False
+    else:
+        new_streak = 1
+        show_congrats = False
+    
+    new_longest = stats['longest_streak']
+    if new_longest < new_streak:
+        new_longest = new_streak
+
+    save_user_stats(user_id, new_streak, new_longest, new_active, today)
+    return new_streak, show_congrats
+
+def show_milestone(streak):
+    milestones = {
+        3: "🌱 *Awal yang solid!* 3 hari berturut-turut mencatat. Kebiasaan baik mulai terbentuk!",
+        7: "🔥 *Satu minggu penuh!* Kamu sudah membuktikan kalau kamu bisa disiplin. Lanjutkan!",
+        10: "✅ *Double digits!* 10 hari konsisten. Kontrol keuanganmu makin mantap nih.",
+        30: "🚀 *Satu bulan luar biasa!* Kamu sudah menjadikan finansial sehat sebagai gaya hidup.",
+        60: "💎 *Dua bulan konsisten!* Kedisiplinanmu adalah investasi terbaik untuk masa depanmu.",
+        100: "💯 *Angka legendaris!* 100 hari tanpa putus. Kamu sudah berada di level yang berbeda!",
+        180: "🌟 *Setengah tahun!* Kamu sudah menguasai seni mengelola uang. Inspiratif banget!",
+        365: "👑 *Satu tahun penuh!* Kamu resmi jadi pahlawan keuanganmu sendiri. Selamat atas dedikasimu!",
+        500: "🏛️ *Kokoh tak tergoyahkan!* 500 hari mencatat adalah bukti nyata komitmenmu.",
+        730: "🛡️ *Dua tahun konsisten!* Finansialmu sudah punya pondasi baja berkat ketelitianmu.",
+        1000: "🌌 *Luar biasa!* 1000 hari adalah sebuah pencapaian langka. Kamu benar-benar hebat!"
+    }
+    return milestones.get(streak, "")
