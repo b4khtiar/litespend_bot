@@ -39,7 +39,7 @@ def get_last_transaction(user_id):
     conn = get_db_connection()
     c = conn.cursor()
     c.execute("SELECT * FROM transactions WHERE user_id=? ORDER BY id DESC LIMIT 1", (user_id,))
-    data = c.fetchone()[0]
+    data = c.fetchone()
     conn.close()
     item = {
         "id": data[0],
@@ -391,9 +391,11 @@ def create_user_stats(user_id):
     return active_days
 
 def update_streak(user_id):
-    today = datetime.now().date() - timedelta(hours=7) # Convert to UTC+7
-    yesterday = today - timedelta(days=1)
-    
+    # date string with format YYYY-MM-DD
+    today_str = datetime.now().strftime('%Y-%m-%d')
+    yesterday_str = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+    two_days_ago_str = (datetime.now() - timedelta(days=2)).strftime('%Y-%m-%d')
+
     # Ambil data streak user
     stats = get_user_stats(user_id) # {current_streak, last_input_date}
     if stats == None:
@@ -403,12 +405,15 @@ def update_streak(user_id):
     last_date = stats['last_input_date']
     current_s = stats['current_streak']
     new_active = stats['total_days'] + 1
-    if last_date == today:
+    if last_date == today_str:
         return current_s, False # Sudah update hari ini
     
-    if last_date == yesterday:
+    if last_date == yesterday_str:
         new_streak = current_s + 1
         show_congrats = True if new_streak in [3, 7, 10, 30, 60, 100, 180, 365, 500, 730, 1000] else False
+    elif last_date == two_days_ago_str:
+        new_streak = current_s + 2
+        show_congrats = False
     else:
         new_streak = 1
         show_congrats = False
