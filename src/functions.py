@@ -391,7 +391,7 @@ def create_user_stats(user_id):
     return active_days
 
 def update_streak(user_id):
-    today = datetime.now().date()
+    today = datetime.now().date() - timedelta(hours=7) # Convert to UTC+7
     yesterday = today - timedelta(days=1)
     
     # Ambil data streak user
