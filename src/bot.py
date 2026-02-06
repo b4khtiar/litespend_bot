@@ -13,11 +13,27 @@ ALLOWED_ID = int(os.environ.get('ALLOWED_ID', 0))
 
 bot = telebot.TeleBot(TOKEN)
 user_data = {}
+STICKERS = {
+    'MILESTONE': 'CAACAgEAAxkBAAIBq2mFZuaZaaeb1SKHiyx2NEjV8ZtNAAI5AwACdR4gRMnYSPTiUO3wOAQ', # trophy
+    # 'MILESTONE': 'CAACAgIAAxkBAAIBo2mFZP0PNFsGNbRzxCd1AyACtvmiAALHAAOYv4ANCjx-VAABozVUOAQ', # jempol
+}
 
 # Jangan merespon user selain allowed_id
 @bot.message_handler(func=lambda message: message.from_user.id != ALLOWED_ID)
 def unauthorized():
     return
+
+# --- tambahan fitur pribadi ---
+# kirim sticker dibalas dengan ID sticker
+# @bot.message_handler(content_types=['sticker'])
+# def get_sticker_id(message):
+#     sticker_id = message.sticker.file_id
+#     text = (
+#         f"✅ *Sticker Terdeteksi!*\n\n"
+#         f"ID: `{sticker_id}`"
+#     )
+#     bot.reply_to(message, text, parse_mode="Markdown")
+# ------------------------------
 
 @bot.message_handler(commands=['start'])
 def start(message):
@@ -56,7 +72,7 @@ def stats(message):
 def insight(message):
     if message.from_user.id != ALLOWED_ID: return
     user_id = message.from_user.id
-    text = functions.get_weekly_insight_logic(user_id)
+    text, emotion = functions.get_weekly_insight_logic(user_id)
     bot.reply_to(message, text, parse_mode="Markdown")
 
 @bot.message_handler(commands=['rekap'])
@@ -144,6 +160,8 @@ def handle_callbacks(call):
                     call.message.message_id,
                     parse_mode="Markdown")
                 del user_data[user_id]
+                # if show_congrats:
+                #     bot.send_sticker(call.message.chat.id, STICKERS['MILESTONE'])
         else:
             bot.answer_callback_query(call.id, "Sesi habis, input ulang ya.")
 

@@ -120,6 +120,7 @@ def get_weekly_insight_logic(user_id, is_archive=False):
         # buat persentase (absolut dan bulatkan tanpa desimal)
         diff_percent = round(abs(diff / last_week_total * 100))
 
+    emotion = "happy" if diff <= 0 else "sad"
     status = "Stabil"
     suggestion = "Pengeluaranmu minggu ini stabil banget! ⚖️ Ini tanda kamu sudah punya kontrol yang matang atas gaya hidupmu. Predictable is good! 👏"
     if diff > 0:
@@ -148,7 +149,7 @@ def get_weekly_insight_logic(user_id, is_archive=False):
     conn.commit()
     conn.close()
     
-    return insight_text
+    return insight_text, emotion
 
 def get_monthly_insight_logic(user_id, is_archive=False):
     now = datetime.now()
@@ -199,6 +200,7 @@ def get_monthly_insight_logic(user_id, is_archive=False):
               (previous_period, user_id))
     prev_data = c.fetchone()
 
+    emotion = "happy"
     # --- KONSTRUKSI TEKS ---
     insight_text = f"📊 *Ringkasan {now.strftime('%B %Y')}*\n━━━━━━━━━━━━━━━\n\n"
     diff_percent = 0
@@ -211,7 +213,9 @@ def get_monthly_insight_logic(user_id, is_archive=False):
             diff_percent = round(abs(diff / previous_total * 100))
         
         status = "Stabil"
-        if diff > 0: status = f"🔴 Naik {diff_percent}%"
+        if diff > 0: 
+            status = f"🔴 Naik {diff_percent}%"
+            emotion = "sad"
         elif diff < 0: status = f"🟢 Turun {diff_percent}%"
         
         insight_text += f"Total pengeluaran *Rp {this_month_total:,.0f}*, {status} dari bulan lalu.\n"
@@ -232,7 +236,7 @@ def get_monthly_insight_logic(user_id, is_archive=False):
     
     conn.commit()
     conn.close()
-    return insight_text
+    return insight_text, emotion
 
 def get_stats_logic(user_id):
     conn = get_db_connection()
