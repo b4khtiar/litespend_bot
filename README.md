@@ -11,6 +11,7 @@ Berbeda dengan aplikasi keuangan yang penuh dengan grafik kompleks dan menu yang
 - 📊 **Smart Reports:** Rekap harian mendetail & rekap bulanan yang dikelompokkan per kategori dengan bar chart visual (ASCII).
 - 🔔 **Habit Reminder:** Bot akan mengingatkanmu setiap jam 9 malam jika kamu lupa mencatat hari itu.
 - 🗑️ **Quick Undo:** Salah input? Cukup gunakan fitur hapus transaksi terakhir.
+- 🎯 **Motivational Features:** Lacak konsistensi mencatat keuangan dengan streak dan milestone.
 - 📂 **CSV Export:** Ekspor seluruh data ke format CSV yang siap dibuka di Excel atau Google Sheets.
 - 🔒 **Privacy-First:** Data disimpan di database SQLite milikmu sendiri. Bot hanya merespons ID Telegram yang sudah kamu whitelist.
 
@@ -70,9 +71,13 @@ Untuk menjaga chat tetap bersih, gunakan "Auto-Delete Messages":
 └── docker-compose.yml # Definisi container
 ```
 
+## 🚧 Rencana Pengembangan
+
+- [ ] Limitasi fitur streak-recovery hanya 1 atau 2 pekan sekali.
+
 ## 🤝 Catatan
 
-Bot ini dibuat untuk penggunaan pribadi, jika ingin menjalankan sendiri, silahkan ikuti langkah-langkah di atas.
+Bot ini dibuat untuk penggunaan pribadi, namun siapapun boleh menggunakan. Jika ingin menjalankan sendiri di server anda, silahkan ikuti langkah-langkah di atas.
 
 
 

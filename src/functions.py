@@ -417,6 +417,7 @@ def update_streak(user_id):
         new_streak = current_s + 1
         show_congrats = True if new_streak in [3, 7, 10, 30, 60, 100, 180, 365, 500, 730, 1000] else False
     elif last_date == two_days_ago_str:
+        # TODO: streak recovery limit, 1 per pekan
         new_streak = current_s + 2
         show_congrats = False
         message = "🛡️ *Streak Recovery Active!* Aku selamatkan streak-mu karena kamu kembali hari ini. Lanjutkan konsistensinya! 🔥"
