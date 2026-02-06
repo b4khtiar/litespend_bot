@@ -130,13 +130,14 @@ def handle_callbacks(call):
         if data:
             if functions.save_transaction(data['amount'], category, data['desc'], user_id):
                 # update streak functionality
-                streak, show_congrats = functions.update_streak(user_id)
+                streak, show_congrats, message = functions.update_streak(user_id)
 
                 text = f"✅ **{data['desc']}** senilai **Rp {data['amount']:,}** masuk ke kategori **{category}**. 🔥`{streak}`"
                 if show_congrats:
                     milestone = functions.get_milestone(streak)
                     text += f"\n\n{milestone}"
-
+                if message:
+                    text += f"\n\n{message}"
                 bot.edit_message_text(
                     text,
                     call.message.chat.id,

@@ -395,18 +395,19 @@ def update_streak(user_id):
     today_str = datetime.now().strftime('%Y-%m-%d')
     yesterday_str = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
     two_days_ago_str = (datetime.now() - timedelta(days=2)).strftime('%Y-%m-%d')
-
+    message = None
     # Ambil data streak user
     stats = get_user_stats(user_id) # {current_streak, last_input_date}
     if stats == None:
         start_streak = create_user_stats(user_id)
-        return start_streak, False
+        message = "🔥 *Streak Dimulai!* Kamu telah mencatat pengeluaran pertamamu. Terus konsisten ya! 🚀"
+        return start_streak, False, message
     
     last_date = stats['last_input_date']
     current_s = stats['current_streak']
     new_active = stats['total_days'] + 1
     if last_date == today_str:
-        return current_s, False # Sudah update hari ini
+        return current_s, False, message # Sudah update hari ini
     
     if last_date == yesterday_str:
         new_streak = current_s + 1
@@ -414,16 +415,18 @@ def update_streak(user_id):
     elif last_date == two_days_ago_str:
         new_streak = current_s + 2
         show_congrats = False
+        message = "🛡️ *Streak Recovery Active!* Aku selamatkan streak-mu karena kamu kembali hari ini. Lanjutkan konsistensinya! 🔥"
     else:
         new_streak = 1
         show_congrats = False
+        message = "📉 *Streak terputus.* Gak apa-apa, ayo mulai perjalanan baru hari ini! Semangat lagi! ✨"
     
     new_longest = stats['longest_streak']
     if new_longest < new_streak:
         new_longest = new_streak
 
     save_user_stats(user_id, new_streak, new_longest, new_active, today_str)
-    return new_streak, show_congrats
+    return new_streak, show_congrats, message
 
 def show_milestone(streak):
     milestones = {
