@@ -422,7 +422,7 @@ def update_streak(user_id):
     if new_longest < new_streak:
         new_longest = new_streak
 
-    save_user_stats(user_id, new_streak, new_longest, new_active, today)
+    save_user_stats(user_id, new_streak, new_longest, new_active, today_str)
     return new_streak, show_congrats
 
 def show_milestone(streak):
