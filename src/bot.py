@@ -160,8 +160,8 @@ def handle_callbacks(call):
                     call.message.message_id,
                     parse_mode="Markdown")
                 del user_data[user_id]
-                # if show_congrats:
-                #     bot.send_sticker(call.message.chat.id, STICKERS['MILESTONE'])
+                if show_congrats:
+                    bot.send_sticker(call.message.chat.id, STICKERS['MILESTONE'])
         else:
             bot.answer_callback_query(call.id, "Sesi habis, input ulang ya.")
 
