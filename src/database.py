@@ -36,6 +36,8 @@ def init_db():
     c.execute('''CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_insight 
                  ON insights (user_id, period_type, period_date)''')
     
+    # create table user_stats (drop if exist)
+    c.execute('''DROP TABLE IF EXISTS user_stats''')
     c.execute('''CREATE TABLE IF NOT EXISTS user_stats
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   user_id INTEGER,
@@ -44,7 +46,11 @@ def init_db():
                   first_input_date TEXT,
                   total_days INTEGER DEFAULT 0,
                   last_input_date TEXT,
+                  latest_recovery_date TEXT DEFAULT "",
                   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     
+    # create index for user_stats
+    c.execute('CREATE INDEX IF NOT EXISTS idx_user_id ON user_stats(user_id)')
+
     conn.commit()
     conn.close()

@@ -258,8 +258,9 @@ def get_stats_logic(user_id):
         start_date_clean = datetime.strptime(start_date_strip, "%Y-%m-%d").strftime("%d %B %Y")
     last_date_clean = "hari ini"  # sementara
     if stats['last_input_date']:
-        last_date_strip = stats['last_input_date'].split()[0]
-        last_date_clean = datetime.strptime(last_date_strip, "%Y-%m-%d").strftime("%d %B %Y")
+        if stats['last_input_date'] != datetime.now().strftime("%Y-%m-%d"):
+            last_date_strip = stats['last_input_date'].split()[0]
+            last_date_clean = datetime.strptime(last_date_strip, "%Y-%m-%d").strftime("%d %B %Y")
     freq_text = f"{most_freq[0]} ({most_freq[1]}x)" if most_freq else "-"
 
     # Ambil motivasi random
@@ -356,7 +357,7 @@ def get_report(period , user_id):
 def get_user_stats(user_id):
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("SELECT current_streak, longest_streak, first_input_date, total_days, last_input_date FROM user_stats WHERE user_id=?", (user_id,))
+    c.execute("SELECT current_streak, longest_streak, first_input_date, total_days, last_input_date, latest_recovery_date FROM user_stats WHERE user_id=?", (user_id,))
     row = c.fetchone()
     conn.close()
     if row:
@@ -365,15 +366,16 @@ def get_user_stats(user_id):
             'longest_streak': row[1],
             'first_input_date': row[2],
             'total_days': row[3],
-            'last_input_date': row[4]
+            'last_input_date': row[4],
+            'latest_recovery_date': row[5]
         }
     return None
 
-def save_user_stats(user_id, new_streak, new_longest, new_active, input_date):
+def save_user_stats(user_id, new_streak, new_longest, new_active, input_date, recovery_date):
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("UPDATE user_stats SET current_streak=?, longest_streak=?, total_days=?, last_input_date=? WHERE user_id=?",
-              (new_streak, new_longest, new_active, input_date, user_id))
+    c.execute("UPDATE user_stats SET current_streak=?, longest_streak=?, total_days=?, last_input_date=?, latest_recovery_date=? WHERE user_id=?",
+              (new_streak, new_longest, new_active, input_date, recovery_date, user_id))
     conn.commit()
     conn.close()
 
@@ -410,6 +412,7 @@ def update_streak(user_id):
     last_date = stats['last_input_date']
     current_s = stats['current_streak']
     new_active = stats['total_days'] + 1
+    recovery_date = stats['latest_recovery_date'] or ""
     if last_date == today_str:
         return current_s, False, message # Sudah update hari ini
     
@@ -417,10 +420,20 @@ def update_streak(user_id):
         new_streak = current_s + 1
         show_congrats = True if new_streak in [3, 7, 10, 30, 60, 100, 180, 365, 500, 730, 1000] else False
     elif last_date == two_days_ago_str:
-        # TODO: streak recovery limit, 1 per pekan
-        new_streak = current_s + 2
-        show_congrats = False
-        message = "🛡️ *Streak Recovery Active!* Aku selamatkan streak-mu karena kamu kembali hari ini. Lanjutkan konsistensinya! 🔥"
+        # Streak recovery limit, jika last_recovery_date ada dan kurang dari 7 hari jangan ber Streak recovery
+        if recovery_date and (datetime.now() - datetime.strptime(recovery_date, '%Y-%m-%d')).days <= 7:
+            new_streak = 1
+            show_congrats = False
+            message = "⏳ *Limit Recovery Tercapai*\n" 
+            message += "Wah, jatah penyelamatan streak-mu masih dalam masa tunggu (1x per minggu). 😅\n" 
+            message += "Yuk, mulai perjalanan baru hari ini! Fokus ke depan, satu catatan setiap hari agar streak-mu makin panjang! 🚀"
+        else:
+            # latest_recovery kosong atau lebih dari 7 hari berikan Streak recovery 
+            recovery_date = today_str
+            new_streak = current_s + 2
+            show_congrats = False
+            message = "🛡️ *Streak Recovery Active!*\nAku selamatkan streak-mu karena kamu kembali hari ini. Lanjutkan konsistensinya! 🔥"
+
     else:
         new_streak = 1
         show_congrats = False
@@ -430,7 +443,7 @@ def update_streak(user_id):
     if new_longest < new_streak:
         new_longest = new_streak
 
-    save_user_stats(user_id, new_streak, new_longest, new_active, today_str)
+    save_user_stats(user_id, new_streak, new_longest, new_active, today_str, recovery_date)
     return new_streak, show_congrats, message
 
 def show_milestone(streak):
@@ -447,4 +460,6 @@ def show_milestone(streak):
         730: "🛡️ *Dua tahun konsisten!* Finansialmu sudah punya pondasi baja berkat ketelitianmu.",
         1000: "🌌 *Luar biasa!* 1000 hari adalah sebuah pencapaian langka. Kamu benar-benar hebat!"
     }
+    return milestones.get(streak, "")
+
     return milestones.get(streak, "")
